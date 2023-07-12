@@ -1,0 +1,6 @@
+/arm5_no_packs/_build
+*.TMP
+/arm5_no_packs/JLinkLog.txt
+/arm5_no_packs/JLinkSettings.ini
+/arm5_no_packs/*.uvoptx
+/arm5_no_packs/ecg_afe.uvguix.TriD
