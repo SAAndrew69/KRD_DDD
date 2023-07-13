@@ -8,7 +8,8 @@
 #include "sys.h"
 //#include "utils.h"
 #include "spim_freertos.h"
-#include "ads129x.h"
+//#include "ads129x.h"
+#include "ads_task.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -145,7 +146,9 @@ static void super_task_thread(void *args)
         
    
         // НАСТРОЙКА ПЕРЕФИРИИ
-        
+        // устанавливаю приоритет прерываний от RDY АЦП и разрешаю прерывания от GPIOTE
+        NVIC_SetPriority(GPIOTE_IRQn, GPIOTE_IRQ_PRIORITY);
+        NVIC_EnableIRQ(GPIOTE_IRQn);
 
         // ЗАПУСКАЮ ПРОЦЕССЫ
         err = ads_task_init(ads_task_callback);

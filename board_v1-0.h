@@ -13,6 +13,13 @@
 
 // приоритет прерываний от GPIOE
 #define GPIOTE_IRQ_PRIORITY     7
+/* распределение каналов прерываний GPIOTE (всего их 8)
+0 - ADS129X
+
+
+*/
+#define GPIOTE_CH_ADS129X      0
+#define GPIOTE_INT_ADS129X     GPIOTE_INTENSET_IN0_Msk
 
 
 // GPIOTE PORT >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -70,6 +77,26 @@
 #define ADS129X_START_PIN       (32 + 7) // P1.07 Управление запуском измерений (активный 1)
 #define ADS129X_START()         do{NRF_P1->OUTSET = (1UL << (ADS129X_START_PIN - 32)); NRF_P1->DIRSET = (1UL << (ADS129X_START_PIN - 32));}while(0)
 #define ADS129X_STOP()          do{NRF_P1->OUTCLR = (1UL << (ADS129X_START_PIN - 32)); NRF_P1->DIRSET = (1UL << (ADS129X_START_PIN - 32));}while(0)
+
+#define ADS129X_INT_ENABLE()      (NRF_GPIOTE->INTENSET = GPIOTE_INT_ADS129X)
+#define ADS129X_INT_DISABLE()     (NRF_GPIOTE->INTENCLR = GPIOTE_INT_ADS129X)
+#define ADS129X_INT_IS_ENABLED()  (NRF_GPIOTE->INTENSET & GPIOTE_INT_ADS129X)
+#define ADS129X_RDY_INIT()        do{ \
+                                      NRF_P1->DIRCLR = (1UL << (ADS129X_RDY_PIN - 32)); \
+                                      NRF_P1->PIN_CNF[ADS129X_RDY_PIN - 32] = ((GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos ) | (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)); \
+                                      NRF_GPIOTE->CONFIG[GPIOTE_CH_ADS129X] = ((GPIOTE_CONFIG_MODE_Event << GPIOTE_CONFIG_MODE_Pos) \
+                                      | (GPIOTE_CONFIG_POLARITY_HiToLo << GPIOTE_CONFIG_POLARITY_Pos) \
+                                      | (ADS129X_RDY_PIN << GPIOTE_CONFIG_PSEL_Pos)); \
+                                      NRF_GPIOTE->EVENTS_IN[GPIOTE_CH_ADS129X] = 0; \
+                                  }while(0)
+
+#define ADS129X_RDY_DEINIT()      do{ \
+                                      NRF_GPIOTE->EVENTS_IN[GPIOTE_CH_ADS129X] = 0; \
+                                      NRF_P1->PIN_CNF[ADS129X_RDY_PIN-32] = 0; \
+                                      NRF_GPIOTE->CONFIG[GPIOTE_CH_ADS129X] = ((GPIOTE_CONFIG_MODE_Event << GPIOTE_CONFIG_MODE_Pos) \
+                                      | (GPIOTE_CONFIG_POLARITY_HiToLo << GPIOTE_CONFIG_POLARITY_Pos) \
+                                      | (ADS129X_RDY_PIN << GPIOTE_CONFIG_PSEL_Pos)); \
+                                  }while(0)
 // SPI ADC  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                                 
 

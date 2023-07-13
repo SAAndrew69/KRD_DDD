@@ -8,14 +8,15 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "ads129x.h"
 
 
 /// формат выходных данных от двух АЦП
 typedef struct {
-  ads129x_24bit_t adc0_status;
-  ads129x_24bit_t adc1_status;
-  ads129x_24bit_t  adc0[ADS129X_CH_CNT];
-  ads129x_24bit_t  adc1[ADS129X_CH_CNT];
+  ads129x_24bit_t   adc0_status;
+  ads129x_24bit_t   adc1_status;
+  ads129x_24bit_t   adc0[ADS129X_CH_CNT];
+  ads129x_24bit_t   adc1[ADS129X_CH_CNT];
 } adstask_data_t;
 
 

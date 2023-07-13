@@ -34,6 +34,13 @@ static void *m_spim3Args = NULL; // указатель на аргументы �
 static nrf_drv_wdt_channel_id m_wdt_id; // для обращению к wdt
 #endif
 
+static TPTR m_gpioteChHook[GPIOTE_CH_CNT];  // для хранения указателей на обработчики для каждого канала GPIOTE
+
+
+
+
+
+
 
 /**@brief A function which is hooked to idle task.
  * @note Idle hook must be enabled in FreeRTOS configuration (configUSE_IDLE_HOOK).
@@ -47,7 +54,13 @@ void vApplicationIdleHook( void )
 
 void GPIOTE_IRQHandler(void)
 { // обработчик прерывания от GPIOTE
-
+#if BOARD_V1_0
+  if(NRF_GPIOTE->EVENTS_IN[GPIOTE_CH_ADS129X] && ADS129X_INT_IS_ENABLED())
+  {
+    NRF_GPIOTE->EVENTS_IN[GPIOTE_CH_ADS129X] = 0;
+    if(m_gpioteChHook[GPIOTE_CH_ADS129X]) m_gpioteChHook[GPIOTE_CH_ADS129X]();
+  }
+#endif // BOARD_V1_0
 } // GPIOTE_IRQHandler
 
 
@@ -73,6 +86,14 @@ void sysSetSpim3Hook(TPTA hookA, void *args)
 { // установка обработчика от шины SPIM3
   m_spim3HookA = hookA;
   m_spim3Args = args;
+}
+
+bool sysSetGpioteHook(uint8_t gpioteChannel, TPTR hook)
+{ // установка обработчика для выбранного канала
+  if(gpioteChannel >= GPIOTE_CH_CNT) return false;
+  
+  m_gpioteChHook[gpioteChannel] = hook;
+  return true;
 }
 
 void systemReset(void)

@@ -18,6 +18,7 @@ typedef void (*TPTA)(void *args);
 
 void sysSetLoggerAppIdleHook(TPTR hook); // установка обработчика от модуля logger в системную функцию vApplicationIdleHook()
 void sysSetSpim3Hook(TPTA hookA, void *args); // установка обработчика от шины SPIM3
+bool sysSetGpioteHook(uint8_t gpioteChannel, TPTR hook); // установка обработчика для выбранного канала GPIO
 
 void systemReset(void); // перезагрузка системы
 

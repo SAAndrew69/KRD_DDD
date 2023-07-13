@@ -193,8 +193,8 @@ uint16_t ads129x_read_data(ads129x_handle_t handle, ads129x_data_t *rx_data, uin
   spi_queue_t spi_task = {
     .cmd = ADS129X_CMD_RDATA,
     .cmdBuffLen = 1,
-    .rxData = (uint8_t *)&data,
-    .rxDataLen = sizeof(data),
+    .rxData = (uint8_t *)rx_data,
+    .rxDataLen = sizeof(ads129x_data_t),
     .csPin = hdl->csPin
   };
         

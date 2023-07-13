@@ -294,7 +294,7 @@ static bool spiStartWriteRead(void *instance, uint32_t wait_ticks)
 
 uint16_t spiInit(uint8_t *devID, NRF_SPIM_Type *spim, IRQn_Type irqn, uint8_t irqPrior, uint32_t freq)
 {
-  if(devID == NULL) return (ERR_SPIM_MODULE + ERR_INVALID_PARAMETR);
+  if(devID == NULL) return ERR_INVALID_PARAMETR;
   
   uint8_t id = 0;
   while(id < SPIM_INSTANCE_CNT)
@@ -303,7 +303,7 @@ uint16_t spiInit(uint8_t *devID, NRF_SPIM_Type *spim, IRQn_Type irqn, uint8_t ir
     id++;
   }
   
-  if(id >= SPIM_INSTANCE_CNT) return (ERR_SPIM_MODULE + ERR_NO_SPACE);
+  if(id >= SPIM_INSTANCE_CNT) return ERR_NO_SPACE;
   
   *devID = id; // возвращаю номер ID
   
@@ -347,7 +347,7 @@ if(spim == NRF_SPIM3){
     // настраиваю пины
     SPIM3_PINS_INIT();
   }else{
-    return (ERR_SPIM_MODULE + ERR_DATA);
+    return ERR_DATA;
   }
   
   dev->spim = spim;
@@ -356,13 +356,13 @@ if(spim == NRF_SPIM3){
   
   // создаю мьютекс окончания выполнения текущей задачи
   dev->mutex = xSemaphoreCreateMutex();
-  if(dev->mutex == NULL) err_code = ERR_SPIM_MODULE + ERR_OUT_OF_MEMORY;
+  if(dev->mutex == NULL) err_code = ERR_OUT_OF_MEMORY;
   ERROR_CHECK(err_code);
   xSemaphoreGive(dev->mutex); // никаких задач не выполняется
   
   // создаю семафор выхода из прерывания
   dev->irqSema = xSemaphoreCreateBinary();
-  if(dev->irqSema == NULL) err_code = ERR_SPIM_MODULE + ERR_OUT_OF_MEMORY;
+  if(dev->irqSema == NULL) err_code = ERR_OUT_OF_MEMORY;
   ERROR_CHECK(err_code);
   
   // устанавливаю приоритеры прерываний
@@ -381,7 +381,7 @@ if(spim == NRF_SPIM3){
 
 uint16_t spiDeInit(uint8_t devID)
 {
-  if((devID >= SPIM_INSTANCE_CNT)||(!spim_instance[devID].isInited)) return (ERR_SPIM_MODULE + ERR_INVALID_PARAMETR);
+  if((devID >= SPIM_INSTANCE_CNT)||(!spim_instance[devID].isInited)) return ERR_INVALID_PARAMETR;
   
   spim_instance_t *dev = (spim_instance_t *)&spim_instance[devID];
   

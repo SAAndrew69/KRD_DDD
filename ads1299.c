@@ -10,7 +10,12 @@
 
 #include "ads1299.h"
 #include "nrf.h"
+#include "stdlib.h"
+#include "string.h"
+#include "errors.h"
+#include "nrf_delay.h"
 
+#include "FreeRTOS.h"
 
 
 #define ADS1299_ACCESS_TO_SPI_TIMEOUT_MS    200     // таймаут ожидания доступа к шине SPI
@@ -59,25 +64,25 @@ void ads1299_def_config(ads1299_config_t *config)
         .single_shot = 0            // Continuous conversion mode
     };
     ads1299_loff_t  loff = {
-        .flead_off = ADS1298_FLEAD_OFF_DC,  // DC lead-off detection
+        .flead_off = ADS1299_FLEAD_OFF_DC,  // DC lead-off detection
         .ilead_off = ADS1299_ILEAD_OFF_6N,  // 6nA
         .comp_th = ADS1299_COMP_THP_95      // 95%
     };
     ads1299_chset_t chset = {
-        .mux = ADS1298_MUX_TEST,    // Test signal
+        .mux = ADS1299_MUX_TEST,    // Test signal
         .srb2 = 0,                  // Open
         .gain = ADS1299_GAIN_1,     // Усиление 1
         .pd = 0,                    // Канал подключен
     };
     ads1299_gpio_t  gpio = {
-        .ctrl1 = 1,                 // вход
-        .crtl2 = 1,                 // вход
-        .ctrl3 = 1,                 // вход
-        .ctrl4 = 1                  // вход
+        .ctrl_1 = 1,                 // вход
+        .ctrl_2 = 1,                 // вход
+        .ctrl_3 = 1,                 // вход
+        .ctrl_4 = 1                  // вход
     };
     ads1299_misc1_t misc1 = {
         .srb1 = 0                   // Switches open
-    }
+    };
 
     memset(config, 0, sizeof(ads1299_config_t));
 
@@ -154,7 +159,7 @@ uint16_t ads1299_get_config(ads129x_handle_t handle, ads1299_config_t *config)
     ASSERT((handle != NULL) || (config != NULL));
 
     ERROR_CHECK(ads129x_read_regs(handle, ADS1299_REG_CONFIG1, 17, (uint8_t *)&config->config1, ADS1299_ACCESS_TO_SPI_TIMEOUT_MS));
-    return ads129x_read_regs(handle, ADS1299_REG_GPIO, 4, (uint8_t *)&config-gpio, ADS1299_ACCESS_TO_SPI_TIMEOUT_MS);
+    return ads129x_read_regs(handle, ADS1299_REG_GPIO, 4, (uint8_t *)&config->gpio, ADS1299_ACCESS_TO_SPI_TIMEOUT_MS);
 }
 
 
@@ -190,7 +195,7 @@ uint16_t ads1299_set_config(ads129x_handle_t handle, ads1299_config_t *config)
  *  ERR_NOT_INITED: интерфейс SPI не инициализирован
  *  ERR_TIMEOUT: таймаут ожидания доступа к шине SPI
 */
-uint16_t ads1299_set_config(ads129x_handle_t handle, uint8_t ch_no, ads1299_chset_t ch_config)
+uint16_t ads1299_set_chcfg(ads129x_handle_t handle, uint8_t ch_no, ads1299_chset_t ch_config)
 {
     ASSERT(handle != NULL);
 

@@ -448,6 +448,16 @@
               <FileType>1</FileType>
               <FilePath>..\ads129x.c</FilePath>
             </File>
+            <File>
+              <FileName>ads1299.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ads1299.c</FilePath>
+            </File>
+            <File>
+              <FileName>ads_task.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ads_task.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -4531,6 +4541,16 @@
               <FileName>ads129x.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\ads129x.c</FilePath>
+            </File>
+            <File>
+              <FileName>ads1299.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ads1299.c</FilePath>
+            </File>
+            <File>
+              <FileName>ads_task.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ads_task.c</FilePath>
             </File>
           </Files>
         </Group>

@@ -19,26 +19,31 @@
 #include "settings.h"
 #include "custom_board.h"
 #include "nrf_delay.h"
+#include "errors.h"
+#include "string.h"
+#include "spim_freertos.h"
+#include "sys.h"
 
 // FreeRTOS
 #include "FreeRTOS.h"
-#include "tasks.h"
+#include "task.h"
 #include "semphr.h"
+#include "queue.h"
 
 
 
 // НАСТРОЙКИ МОДУЛЯ ************************************
 #ifndef ADSTASK_STACK_SIZE
-#define ADSTASK_STACK_SIZE				1024			// размер стека (стек выделяется в словах uint32_t)
+#define ADSTASK_STACK_SIZE				          1024  // размер стека (стек выделяется в словах uint32_t)
 #endif // ADSTASK_STACK_SIZE
 #ifndef ADSTASK_PRIORITY
-#define ADSTASK_PRIORITY					3					// приоритет 
+#define ADSTASK_PRIORITY					          3			// приоритет 
 #endif // ADSTASK_PRIORITY
 #ifndef ADSTASK_DATA_QUEUE_SIZE
-#define ADSTASK_DATA_QUEUE_SIZE             3           // длина очереди принятых данных в блоках данных
+#define ADSTASK_DATA_QUEUE_SIZE             3     // длина очереди принятых данных в блоках данных
 #endif // ADSTASK_DATA_QUEUE_SIZE
 #ifndef ADSTASK_CMD_QUEUE_SIZE
-#define ADSTASK_CMD_QUEUE_SIZE             5           // длина очереди управляющих команд
+#define ADSTASK_CMD_QUEUE_SIZE              5     // длина очереди управляющих команд
 #endif // ADSTASK_CMD_QUEUE_SIZE
 
 #if(RTTLOG_EN)
@@ -54,7 +59,7 @@
 #define RTT_LOG_INFO(...)       \
                                 \
   {                             \
-    NRF_LOG_INFO(TAG +__VA_ARGS__);  \
+    NRF_LOG_INFO(strcat(TAG,__VA_ARGS__));  \
   }
 #else
   #define RTT_LOG_INFO(...) {}
@@ -84,6 +89,13 @@ static ads_task_callback_t m_callback = NULL; // функция верхнего
 
 
 
+
+static void ads_rdy_isr(void)
+{ // обработчик перывания от RDY
+  ads_task_cmd_e cmd = ADS_TASK_CMD_DATA;
+  xQueueSendFromISR(m_q_cmd, &cmd, NULL);
+}
+
 // отправка команды в ads_task
 static bool ads_send_cmd(ads_task_cmd_e cmd)
 {
@@ -92,20 +104,19 @@ static bool ads_send_cmd(ads_task_cmd_e cmd)
 }
 
 
-
 // в этом потоке осуществляется прием и обработка данных с двух АЦП
 static void ads_task(void *args)
 {
-    ads_task_cmd_e cmd = ADS_TASK_CMD_NONE;
+    ads_task_cmd_e cmd;
     adstask_data_t ads_data;
     ads1299_config_t adc0_cfg;
     ads1299_config_t adc1_cfg;
-    bool single_shot = fasle;
+    bool single_shot = false;
 
     ads_send_cmd(ADS_TASK_CMD_INIT);
 
     for(;;) {
-        if(pdTRUE != xQueueReceive(m_q_cmd, &cmd, portMAX_Delay)) {
+        if(pdTRUE != xQueueReceive(m_q_cmd, &cmd, portMAX_DELAY)) {
             RTT_LOG_INFO("Ошибка ожидания команды управления");
             break;
         }
@@ -117,7 +128,7 @@ static void ads_task(void *args)
                 memset(&ads_data, 0, sizeof(ads_data));
                 ads129x_data_t data;
                 // читаю данных из АЦП 0
-                uint16_t err = ads1299_get_data(m_m_adc0_handle, &data);
+                uint16_t err = ads1299_get_data(m_adc0_handle, &data);
                 if(err != ERR_NOERROR) {
                     RTT_LOG_INFO("Ошибка чтения данных из АЦП 0");
                     break;
@@ -128,7 +139,7 @@ static void ads_task(void *args)
                 memcpy(&ads_data.adc0, &data.ch[0], sizeof(ads_data.adc0));
 
                 // читаю данные из АЦП 1
-                uint16_t err = ads1299_get_data(m_m_adc1_handle, &data);
+                err = ads1299_get_data(m_adc1_handle, &data);
                 if(err != ERR_NOERROR) {
                     RTT_LOG_INFO("Ошибка чтения данных из АЦП 1");
                     break;
@@ -151,13 +162,14 @@ static void ads_task(void *args)
                 ADS129X_START(); // запускаю измерения
                 if(single_shot) {
                     ads_send_cmd(ADS_TASK_CMD_STOP);
-                    single_shot = fasle;
+                    single_shot = false;
                 }
             break;
 
             case ADS_TASK_CMD_STOP:
                 RTT_LOG_INFO("ADS_TASK_CMD_STOP");
-                // TODO запрещаю прерывания от АЦП
+                // запрещаю прерывания от АЦП
+                ADS129X_INT_DISABLE();
                 ADS129X_STOP(); // останавливаю измерения
             break;
 
@@ -231,10 +243,6 @@ static void ads_task(void *args)
 
 
 
-
-
-
-
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /**
@@ -276,7 +284,9 @@ uint16_t ads_task_init(ads_task_callback_t callback)
         }
 
         // настраиваю прерывание от АЦП
-        // TODO
+        ADS129X_RDY_INIT();
+        sysSetGpioteHook(GPIOTE_CH_ADS129X, ads_rdy_isr);
+        ADS129X_INT_ENABLE();
         
         // создаю задачу для реализации логики работы
         if(pdTRUE != xTaskCreate(ads_task, "ADS TASK", ADSTASK_STACK_SIZE, NULL, ADSTASK_PRIORITY, &m_ads_task)) {
@@ -317,7 +327,7 @@ uint16_t ads_task_deinit(void)
 {
     // отправляю управляющую команду в задачу
     if(m_q_cmd) {
-        if(xQueueSend(ADS_TASK_CMD_TERMINATE)) return ERR_NOERROR;
+        if(ads_send_cmd(ADS_TASK_CMD_TERMINATE)) return ERR_NOERROR;
     }
     
     // TODO запрещаю прерывания от АЦП
@@ -340,6 +350,8 @@ uint16_t ads_task_deinit(void)
         m_ads_task = NULL;
     }
     m_callback = NULL;
+    
+    return ERR_NOERROR;
 }
 
 

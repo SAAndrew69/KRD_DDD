@@ -301,7 +301,7 @@ uint16_t ads1299_set_config(ads129x_handle_t handle, ads1299_config_t *config);
  *  ERR_NOT_INITED: интерфейс SPI не инициализирован
  *  ERR_TIMEOUT: таймаут ожидания доступа к шине SPI
 */
-uint16_t ads1299_set_config(ads129x_handle_t handle, uint8_t ch_no, ads1299_chset_t ch_config);
+uint16_t ads1299_set_chcfg(ads129x_handle_t handle, uint8_t ch_no, ads1299_chset_t ch_config);
 
 
 /**
