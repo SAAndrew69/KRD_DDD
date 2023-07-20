@@ -458,6 +458,16 @@
               <FileType>1</FileType>
               <FilePath>..\ads_task.c</FilePath>
             </File>
+            <File>
+              <FileName>bleDriver.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\bleDriver.c</FilePath>
+            </File>
+            <File>
+              <FileName>bleTask.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\bleTask.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -1585,11 +1595,6 @@
               <FileName>ble_dis.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\sdk\nrf5_sdk_17.0.2_d674dde\components\ble\ble_services\ble_dis\ble_dis.c</FilePath>
-            </File>
-            <File>
-              <FileName>ble_nus_c.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\sdk\nrf5_sdk_17.0.2_d674dde\components\ble\ble_services\ble_nus_c\ble_nus_c.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -4552,6 +4557,16 @@
               <FileType>1</FileType>
               <FilePath>..\ads_task.c</FilePath>
             </File>
+            <File>
+              <FileName>bleDriver.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\bleDriver.c</FilePath>
+            </File>
+            <File>
+              <FileName>bleTask.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\bleTask.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -5679,11 +5694,6 @@
               <FileName>ble_dis.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\sdk\nrf5_sdk_17.0.2_d674dde\components\ble\ble_services\ble_dis\ble_dis.c</FilePath>
-            </File>
-            <File>
-              <FileName>ble_nus_c.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\sdk\nrf5_sdk_17.0.2_d674dde\components\ble\ble_services\ble_nus_c\ble_nus_c.c</FilePath>
             </File>
           </Files>
         </Group>

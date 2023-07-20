@@ -29,13 +29,13 @@
 
 typedef uint32_t *ads129x_handle_t;
 
-__packed typedef struct {
-  uint32_t  val: 24;
+typedef struct {
+  uint8_t  val[3];
 }ads129x_24bit_t;
 
 
 // формат данных от АЦП: 24 бита статус и 8 каналов по 24 бита данные (всего 216 бит)
-__packed typedef struct {
+typedef struct {
   ads129x_24bit_t   status;
   ads129x_24bit_t   ch[ADS129X_CH_CNT];
 } ads129x_data_t;

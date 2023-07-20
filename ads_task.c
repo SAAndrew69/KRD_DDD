@@ -2,6 +2,7 @@
  * Модуль реализует логику работы с двумя АЦП
  * 
  * 11.07.2023 - Начало работы
+ * 20.07.2023 - Отладил работу модуля
  * 
  * 
  * ЛОГИКА РАБОТЫ
@@ -59,7 +60,7 @@
 #define RTT_LOG_INFO(...)       \
                                 \
   {                             \
-    NRF_LOG_INFO(strcat(TAG,__VA_ARGS__));  \
+    NRF_LOG_INFO(__VA_ARGS__);  \
   }
 #else
   #define RTT_LOG_INFO(...) {}
@@ -103,6 +104,20 @@ static bool ads_send_cmd(ads_task_cmd_e cmd)
     return xQueueSend(m_q_cmd, &cmd, 0);
 }
 
+static int32_t sample24bitToInt32(ads129x_24bit_t sample)
+{ // преобразует сэмпл одного канала АЦП 24 бит в int32_t
+  int32_t res = 0;
+  if(sample.val[0] & 0x80) res = 0xFF000000;
+  res += ((int32_t)sample.val[0] << 16) + ((int32_t)sample.val[1] << 8) + sample.val[2];
+  return res;
+}
+
+static uint32_t sample24bitToUint32(ads129x_24bit_t sample)
+{ // преобразует сэмпл одного канала АЦП 24 бит в int32_t
+  uint32_t res = ((int32_t)sample.val[0] << 16) + ((int32_t)sample.val[1] << 8) + sample.val[2];
+  return res;
+}
+
 
 // в этом потоке осуществляется прием и обработка данных с двух АЦП
 static void ads_task(void *args)
@@ -112,54 +127,80 @@ static void ads_task(void *args)
     ads1299_config_t adc0_cfg;
     ads1299_config_t adc1_cfg;
     bool single_shot = false;
+  
+    uint32_t sample_cnt = 0; // TEST
 
     ads_send_cmd(ADS_TASK_CMD_INIT);
 
     for(;;) {
         if(pdTRUE != xQueueReceive(m_q_cmd, &cmd, portMAX_DELAY)) {
-            RTT_LOG_INFO("Ошибка ожидания команды управления");
+            RTT_LOG_INFO("Cmd timeout");
             break;
         }
 
         switch (cmd) {
             case ADS_TASK_CMD_DATA: // требуется прочитать очередную порцию данных
             {
-                RTT_LOG_INFO("ADS_TASK_CMD_DATA");
                 memset(&ads_data, 0, sizeof(ads_data));
                 ads129x_data_t data;
                 // читаю данных из АЦП 0
                 uint16_t err = ads1299_get_data(m_adc0_handle, &data);
                 if(err != ERR_NOERROR) {
-                    RTT_LOG_INFO("Ошибка чтения данных из АЦП 0");
+                    RTT_LOG_INFO("Read ADC 0 error 0x%04X", err);
                     break;
                 }
+                
+//                if(sample_cnt == 3)
+//                {
+//                  NRF_LOG_INFO("adc_data0:");
+//                  NRF_LOG_HEXDUMP_INFO(&data, sizeof(data)); 
+//                }
 
                 // сохраняю прочитанные данные в буфер
-                ads_data.adc0_status = data.status;
-                memcpy(&ads_data.adc0, &data.ch[0], sizeof(ads_data.adc0));
+                ads_data.adc0_status = sample24bitToUint32(data.status);
+                for(uint8_t i = 0; i < ADS129X_CH_CNT; i++)
+                {
+                  ads_data.adc0[i] = sample24bitToInt32(data.ch[i]);
+                }
 
                 // читаю данные из АЦП 1
                 err = ads1299_get_data(m_adc1_handle, &data);
                 if(err != ERR_NOERROR) {
-                    RTT_LOG_INFO("Ошибка чтения данных из АЦП 1");
+                    RTT_LOG_INFO("Read ADC 1 error 0x%04X", err);
                     break;
                 }
+                
+//                if(sample_cnt == 3)
+//                {
+//                  NRF_LOG_INFO("adc_data1:");
+//                  NRF_LOG_HEXDUMP_INFO(&data, sizeof(data)); 
+//                }
 
                 // сохраняю прочитанные данные в буфер
-                ads_data.adc1_status = data.status;
-                memcpy(&ads_data.adc1, &data.ch[0], sizeof(ads_data.adc1));
+                ads_data.adc1_status = sample24bitToUint32(data.status);
+                for(uint8_t i = 0; i < ADS129X_CH_CNT; i++)
+                {
+                  ads_data.adc1[i] = sample24bitToInt32(data.ch[i]);
+                }
 
                 // вызываю колбэк и передаю данные на верхний уровень
                 if(m_callback) {
                     m_callback(&ads_data);
                 }
+                
+                sample_cnt++;
             }
             break;
 
             case ADS_TASK_CMD_START:
                 RTT_LOG_INFO("ADS_TASK_CMD_START");
-                // TODO разрешаю прерывания от АЦП
+                sample_cnt = 0;
+                // разрешаю прерывания от АЦП
+                ADS129X_INT_ENABLE();
                 ADS129X_START(); // запускаю измерения
+                //ads129x_cmd(m_adc0_handle, ADS129X_CMD_START, pdMS_TO_TICKS(100)); // TEST
+                //ads129x_cmd(m_adc1_handle, ADS129X_CMD_START, pdMS_TO_TICKS(100)); // TEST
+            
                 if(single_shot) {
                     ads_send_cmd(ADS_TASK_CMD_STOP);
                     single_shot = false;
@@ -168,6 +209,7 @@ static void ads_task(void *args)
 
             case ADS_TASK_CMD_STOP:
                 RTT_LOG_INFO("ADS_TASK_CMD_STOP");
+                RTT_LOG_INFO("sample_cnt = %d", --sample_cnt);
                 // запрещаю прерывания от АЦП
                 ADS129X_INT_DISABLE();
                 ADS129X_STOP(); // останавливаю измерения
@@ -175,20 +217,20 @@ static void ads_task(void *args)
 
             case ADS_TASK_CMD_SINGLE:
             {
-                RTT_LOG_INFO("ADS_TASK_CMD_START");
+                RTT_LOG_INFO("ADS_TASK_CMD_SINGLE");
                 // установить бит "single_shot" и запустить измерения
                 ads1299_config4_t cfg4 = adc0_cfg.config4;
                 cfg4.single_shot = 1;
                 uint16_t err = ads1299_set_reg(m_adc0_handle, ADS1299_REG_CONFIG4, *(uint8_t *)&cfg4);
                 if(err != ERR_NOERROR) {
-                    RTT_LOG_INFO("Ошибка записи в регистр config4");
+                    RTT_LOG_INFO("Write to config4 ADC 0 error 0x%04X", err);
                     break;
                 }
                 cfg4 = adc1_cfg.config4;
                 cfg4.single_shot = 1;
                 err = ads1299_set_reg(m_adc1_handle, ADS1299_REG_CONFIG4, *(uint8_t *)&cfg4);
                 if(err != ERR_NOERROR) {
-                    RTT_LOG_INFO("Ошибка записи в регистр config4");
+                    RTT_LOG_INFO("Write to config4 ADC 1 error 0x%04X", err);
                     break;
                 }
                 single_shot = true;
@@ -209,18 +251,19 @@ static void ads_task(void *args)
                 ads1299_def_config(&adc0_cfg); 
                 ads1299_def_config(&adc1_cfg);
                 // изменяю конфигурацию
+                //NRF_LOG_HEXDUMP_INFO(&adc0_cfg, sizeof(adc0_cfg)); // TEST
                 // TODO
                 // заливаю новые конфиги в АЦП
                 uint16_t err = ads1299_init(m_adc0_handle, &adc0_cfg);
                 if(err != ERR_NOERROR) {
-                    RTT_LOG_INFO("Ошибка при инициализации АЦП 0")
+                    RTT_LOG_INFO("Init ADC 0 error 0x%04X", err)
                 }
                 err = ads1299_init(m_adc1_handle, &adc1_cfg);
                 if(err != ERR_NOERROR) {
-                    RTT_LOG_INFO("Ошибка при инициализации АЦП 1")
+                    RTT_LOG_INFO("Init ADC 1 error 0x%04X", err)
                     break;
                 }
-                RTT_LOG_INFO("Инициализация АЦП0 и АЦП1 успешно завершена");
+                RTT_LOG_INFO("Init ADC 0 and ADC 1 COMPLETE");
             }
             break;
             
@@ -286,7 +329,6 @@ uint16_t ads_task_init(ads_task_callback_t callback)
         // настраиваю прерывание от АЦП
         ADS129X_RDY_INIT();
         sysSetGpioteHook(GPIOTE_CH_ADS129X, ads_rdy_isr);
-        ADS129X_INT_ENABLE();
         
         // создаю задачу для реализации логики работы
         if(pdTRUE != xTaskCreate(ads_task, "ADS TASK", ADSTASK_STACK_SIZE, NULL, ADSTASK_PRIORITY, &m_ads_task)) {

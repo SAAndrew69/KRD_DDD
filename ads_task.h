@@ -13,14 +13,14 @@
 
 /// формат выходных данных от двух АЦП
 typedef struct {
-  ads129x_24bit_t   adc0_status;
-  ads129x_24bit_t   adc1_status;
-  ads129x_24bit_t   adc0[ADS129X_CH_CNT];
-  ads129x_24bit_t   adc1[ADS129X_CH_CNT];
+  uint32_t   adc0_status;
+  uint32_t   adc1_status;
+  int32_t    adc0[ADS129X_CH_CNT];
+  int32_t    adc1[ADS129X_CH_CNT];
 } adstask_data_t;
 
 
-typedef void (*ads_task_callback_t)(void *args);
+typedef void (*ads_task_callback_t)(adstask_data_t *args);
 
 
 

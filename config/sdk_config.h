@@ -73,7 +73,7 @@
  
 
 #ifndef BLE_DB_DISCOVERY_ENABLED
-#define BLE_DB_DISCOVERY_ENABLED 1
+#define BLE_DB_DISCOVERY_ENABLED 0
 #endif
 
 // <e> NRF_BLE_CONN_PARAMS_ENABLED - ble_conn_params - Initiating and executing a connection parameters negotiation procedure
@@ -158,7 +158,7 @@
 // <e> NRF_BLE_SCAN_ENABLED - nrf_ble_scan - Scanning Module
 //==========================================================
 #ifndef NRF_BLE_SCAN_ENABLED
-#define NRF_BLE_SCAN_ENABLED 1
+#define NRF_BLE_SCAN_ENABLED 0
 #endif
 // <o> NRF_BLE_SCAN_BUFFER - Data length for an advertising set. 
 #ifndef NRF_BLE_SCAN_BUFFER
@@ -279,7 +279,7 @@
 // <i> Enable/disable central-specific Peer Manager functionality.
 
 #ifndef PM_CENTRAL_ENABLED
-#define PM_CENTRAL_ENABLED 1
+#define PM_CENTRAL_ENABLED 0
 #endif
 
 // <q> PM_SERVICE_CHANGED_ENABLED  - Enable/disable the service changed management for GATT server in Peer Manager.
@@ -298,7 +298,7 @@
 // <i> Set this to false to save code space if not using the peer rank API.
 
 #ifndef PM_PEER_RANKS_ENABLED
-#define PM_PEER_RANKS_ENABLED 1
+#define PM_PEER_RANKS_ENABLED 0
 #endif
 
 // <q> PM_LESC_ENABLED  - Enable/disable LESC support in Peer Manager.
@@ -343,7 +343,7 @@
 // <i>  This might be necessary for interoperability reasons, especially as peripheral.
 
 #ifndef PM_HANDLER_SEC_DELAY_MS
-#define PM_HANDLER_SEC_DELAY_MS 0
+#define PM_HANDLER_SEC_DELAY_MS 10
 #endif
 
 // </e>
@@ -11334,21 +11334,21 @@
 
 // <o> NRF_SDH_BLE_CENTRAL_LINK_COUNT - Maximum number of central links. 
 #ifndef NRF_SDH_BLE_CENTRAL_LINK_COUNT
-#define NRF_SDH_BLE_CENTRAL_LINK_COUNT 1
+#define NRF_SDH_BLE_CENTRAL_LINK_COUNT 0
 #endif
 
 // <o> NRF_SDH_BLE_TOTAL_LINK_COUNT - Total link count. 
 // <i> Maximum number of total concurrent connections using the default configuration.
 
 #ifndef NRF_SDH_BLE_TOTAL_LINK_COUNT
-#define NRF_SDH_BLE_TOTAL_LINK_COUNT 2
+#define NRF_SDH_BLE_TOTAL_LINK_COUNT 1
 #endif
 
 // <o> NRF_SDH_BLE_GAP_EVENT_LENGTH - GAP event length. 
 // <i> The time set aside for this connection on every connection interval in 1.25 ms units.
 
 #ifndef NRF_SDH_BLE_GAP_EVENT_LENGTH
-#define NRF_SDH_BLE_GAP_EVENT_LENGTH 6
+#define NRF_SDH_BLE_GAP_EVENT_LENGTH 40
 #endif
 
 // <o> NRF_SDH_BLE_GATT_MAX_MTU_SIZE - Static maximum MTU size. 
@@ -11867,12 +11867,12 @@
 // <2=> NRF_CLOCK_LF_SRC_SYNTH 
 
 #ifndef NRF_SDH_CLOCK_LF_SRC
-#define NRF_SDH_CLOCK_LF_SRC 1
+#define NRF_SDH_CLOCK_LF_SRC 0
 #endif
 
 // <o> NRF_SDH_CLOCK_LF_RC_CTIV - SoftDevice calibration timer interval. 
 #ifndef NRF_SDH_CLOCK_LF_RC_CTIV
-#define NRF_SDH_CLOCK_LF_RC_CTIV 0
+#define NRF_SDH_CLOCK_LF_RC_CTIV 16
 #endif
 
 // <o> NRF_SDH_CLOCK_LF_RC_TEMP_CTIV - SoftDevice calibration timer interval under constant temperature. 
@@ -11880,7 +11880,7 @@
 // <i>  if the temperature has not changed.
 
 #ifndef NRF_SDH_CLOCK_LF_RC_TEMP_CTIV
-#define NRF_SDH_CLOCK_LF_RC_TEMP_CTIV 0
+#define NRF_SDH_CLOCK_LF_RC_TEMP_CTIV 2
 #endif
 
 // <o> NRF_SDH_CLOCK_LF_ACCURACY  - External clock accuracy used in the LL to compute timing.
@@ -11899,7 +11899,7 @@
 // <11=> NRF_CLOCK_LF_ACCURACY_1_PPM 
 
 #ifndef NRF_SDH_CLOCK_LF_ACCURACY
-#define NRF_SDH_CLOCK_LF_ACCURACY 7
+#define NRF_SDH_CLOCK_LF_ACCURACY 1
 #endif
 
 // </h> 

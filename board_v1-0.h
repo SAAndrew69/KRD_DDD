@@ -74,9 +74,9 @@
 #define ANA_PWR_ON()            do{NRF_P1->OUTSET = (1UL << (ADS129X_PWR_PIN - 32)); NRF_P1->DIRSET = (1UL << (ADS129X_PWR_PIN - 32));}while(0)
 #define ANA_PWR_OFF()           do{NRF_P1->OUTCLR = (1UL << (ADS129X_PWR_PIN - 32)); NRF_P1->DIRSET = (1UL << (ADS129X_PWR_PIN - 32));}while(0)
 
-#define ADS129X_START_PIN       (32 + 7) // P1.07 Управление запуском измерений (активный 1)
-#define ADS129X_START()         do{NRF_P1->OUTSET = (1UL << (ADS129X_START_PIN - 32)); NRF_P1->DIRSET = (1UL << (ADS129X_START_PIN - 32));}while(0)
-#define ADS129X_STOP()          do{NRF_P1->OUTCLR = (1UL << (ADS129X_START_PIN - 32)); NRF_P1->DIRSET = (1UL << (ADS129X_START_PIN - 32));}while(0)
+#define ADS129X_START_PIN       (5) // P0.05 Управление запуском измерений (активный 1)
+#define ADS129X_START()         do{NRF_P0->OUTSET = (1UL << (ADS129X_START_PIN)); NRF_P0->DIRSET = (1UL << (ADS129X_START_PIN));}while(0)
+#define ADS129X_STOP()          do{NRF_P0->OUTCLR = (1UL << (ADS129X_START_PIN)); NRF_P0->DIRSET = (1UL << (ADS129X_START_PIN));}while(0)
 
 #define ADS129X_INT_ENABLE()      (NRF_GPIOTE->INTENSET = GPIOTE_INT_ADS129X)
 #define ADS129X_INT_DISABLE()     (NRF_GPIOTE->INTENCLR = GPIOTE_INT_ADS129X)
