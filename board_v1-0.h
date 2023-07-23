@@ -60,6 +60,7 @@
                                   NRF_P0->DIRSET = (1UL << SPIM3_CS1_PIN); \
                                 }while(0)
 
+#define ADS129X_CNT             2 // число АЦП на плате
 #define ADS129X_CS0_PIN         SPIM3_CS0_PIN
 #define ADS129X_CS1_PIN         SPIM3_CS1_PIN
 #define ADS129X_RESET_PIN       32 // P1.00 (активный 0) сброс

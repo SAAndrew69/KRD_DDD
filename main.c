@@ -50,6 +50,7 @@
 const uint32_t UICR_REGOUT0 __attribute__((at(0x10001304))) __attribute__((used)) = UICR_REGOUT0_VOUT_3V3; 
 
 #define TIME_WAIT_SUPERTASK_ACCESS    3000  // максимальное время ожидания доступа к очереди сообщения для суперзадачи (вместо portMAX_DELAY)
+#define TIME_CMD_MS                   500   // таймаут выполнения команд 
 
 
 #if(RTTLOG_EN)
@@ -332,7 +333,7 @@ void execCmdBle(int16_t conn_handle)
         m_adc_started = true;
         m_adc_sample_cnt = 0;
       }else{
-        RTT_LOG_INFO("MAIN: ADC start fail");
+        RTT_LOG_INFO("CMD: ADC start fail");
       }
     break;
 
@@ -340,9 +341,9 @@ void execCmdBle(int16_t conn_handle)
       if(ERR_NOERROR == ads_task_stop())
       {
         m_adc_started = false;
-        RTT_LOG_INFO("MAIN: ADC sample was %d", m_adc_sample_cnt); // TEST
+        RTT_LOG_INFO("CMD: ADC sample was %d", m_adc_sample_cnt); // TEST
       }else{
-        RTT_LOG_INFO("MAIN: ADC stop fail");
+        RTT_LOG_INFO("CMD: ADC stop fail");
       }
     break;
 
@@ -386,11 +387,37 @@ void execCmdBle(int16_t conn_handle)
     break;
     case CMD_CMD_SET_CAL: // Записать калибровочный коффициент по каналу
     break;
+    
+    case CMD_CMD_GET_CFG: // Запрос конфига (формат: G,n где n - номер АЦП: 0 или 1)
+    {
+        uint8_t adc_no = m_cmdBuff[2] - '0'; // преобразую номер АЦП в число
+        if(adc_no >= ADS129X_CNT)
+        {
+          RTT_LOG_INFO("CMD: Неверный номер АЦП (может быть 0 или 1)");
+          break;
+        }
+        char str[150];
+        memset(str, 0, sizeof(str));
+        snprintf(str, sizeof(str), "%c,", CMD_CMD_GET_CFG);
+        uint16_t err = ads_task_get_config((adstask_adc_no_e)adc_no, (char *)&str[2], sizeof(str)-2, TIME_CMD_MS);
+        if(err != ERR_NOERROR)
+        {
+          RTT_LOG_INFO("CMD: ADC read regs error 0x%04X", err);
+          break;
+        }
+        // в str сформирован ответ вида: G,n,rrvv,....,rrvv где n - номер АЦП (0 или 1), rrvv - uint16_t, где rr - адрес регистра, vv - значение регистра
+        bleTaskTxDataWait(m_conn_handle, (uint8_t *)str, strlen(str), BLE_SEND_TIMEOUT_MS);
+    }
+    break;
+    
+    case CMD_CMD_SET_CFG: // Установка нового конфига (формат как у CMD_CMD_GET_CFG)
+      
+    break;
 
     case CMD_CMD_SHOT   : // Единичный отсчет АЦП
       if(ERR_NOERROR != ads_task_start(true))
       {
-        RTT_LOG_INFO("MAIN: ADC start single shot fail");
+        RTT_LOG_INFO("CMD: ADC start single shot fail");
       }
     break;
 

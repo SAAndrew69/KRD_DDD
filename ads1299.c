@@ -22,8 +22,6 @@
 
 
 
-
-
 /**
  * Дефолтный конфиг
  * 
@@ -134,6 +132,9 @@ uint16_t ads1299_init(ads129x_handle_t handle, ads1299_config_t *config)
     // делаю программный сброс
     ERROR_CHECK(ads129x_cmd(handle, ADS129X_CMD_RESET, ADS1299_ACCESS_TO_SPI_TIMEOUT_MS));
     nrf_delay_us(10);
+  
+    // перевожу в командный режим
+    ERROR_CHECK(ads129x_cmd(handle, ADS129X_CMD_SDATAC, ADS1299_ACCESS_TO_SPI_TIMEOUT_MS));
 
     if(config == NULL) return ERR_NOERROR;
 
@@ -249,6 +250,30 @@ uint16_t ads1299_get_reg(ads129x_handle_t handle, uint8_t reg_addr, uint8_t *val
     if(reg_addr > ADS1299_REG_CONFIG4) return ERR_INVALID_PARAMETR;
 
     return ads129x_read_regs(handle, reg_addr, 1, val, ADS1299_ACCESS_TO_SPI_TIMEOUT_MS);
+}
+
+
+/**
+ * Чтение нескольких регистров
+ * 
+ * handle - Хендл микросхемы на шине SPI
+ * reg_addr - Адрес регистра
+ * cnt - Число регистров для чтения
+ * buff - Буфер для чтения
+ * 
+ * return
+ *  ERR_NOERROR - если ошибок нет
+ *  ERR_INVALID_PARAMETR - в случае ошибки во входных параметрах
+ *  ERR_NOT_INITED: интерфейс SPI не инициализирован
+ *  ERR_TIMEOUT: таймаут ожидания доступа к шине SPI
+*/
+uint16_t ads1299_get_regs(ads129x_handle_t handle, uint8_t reg_addr, uint8_t cnt, uint8_t *buff)
+{
+    ASSERT((handle != NULL) || (buff != NULL) || (cnt == 0));
+
+    if((reg_addr + cnt) > (ADS1299_REG_CONFIG4 + 1)) return ERR_INVALID_PARAMETR;
+  
+    return ads129x_read_regs(handle, reg_addr, cnt, buff, ADS1299_ACCESS_TO_SPI_TIMEOUT_MS);
 }
 
 

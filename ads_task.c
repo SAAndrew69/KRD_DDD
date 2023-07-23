@@ -47,6 +47,7 @@
 #define ADSTASK_CMD_QUEUE_SIZE              5     // длина очереди управляющих команд
 #endif // ADSTASK_CMD_QUEUE_SIZE
 
+
 #if(RTTLOG_EN)
 #include "logger_freertos.h"
 #define RTT_LOG_EN                1     // включить лог через RTT
@@ -73,7 +74,21 @@ typedef enum {
     ADS_TASK_CMD_STOP,      // команда на остановку измерений
     ADS_TASK_CMD_SINGLE,    // команда на запуск одиночного измерения
     ADS_TASK_CMD_TERMINATE, // завершение работы задачи
+    ADS_TASK_CMD_GET_CFG,   // запрос конфига
+    ADS_TASK_CMD_SET_CFG,   // установка нового конфига
 } ads_task_cmd_e;
+
+// структрура для команд чтения и записи кофигурации из вне
+typedef struct {
+  adstask_adc_no_e  adc_no; // номер АЦП
+  uint8_t           *buff;  // указатель на буфер
+} ads_cmd_cfg_t;
+
+// формат очереди заданий
+typedef struct {
+  ads_task_cmd_e    cmd;    // код задания
+  void            * args;  // дополнительные входные данные (может и не быть)
+} ads_task_cmd_t;
 
 
 
@@ -86,22 +101,44 @@ static ads129x_handle_t m_adc1_handle = NULL; // хендл для работы 
 static TaskHandle_t m_ads_task = NULL; // управляющая задача
 static uint8_t m_spiDevID = 0xFF; // ID интерефейса SPI
 static ads_task_callback_t m_callback = NULL; // функция верхнего уровня, в которую передаются принятые данные
-
+static QueueHandle_t m_q_res = NULL; // очередь для передачи результата выполнения команды (используется в некоторых командах)
+static bool m_is_started = false;
+static SemaphoreHandle_t m_mutex = NULL; // мьютекс для ограничения множественных вызовов некоторых функций
 
 
 
 
 static void ads_rdy_isr(void)
 { // обработчик перывания от RDY
-  ads_task_cmd_e cmd = ADS_TASK_CMD_DATA;
+  ads_task_cmd_t cmd = {
+    .cmd = ADS_TASK_CMD_DATA
+  };
   xQueueSendFromISR(m_q_cmd, &cmd, NULL);
 }
 
-// отправка команды в ads_task
+// отправка команды в ads_task без дополнительных данных
 static bool ads_send_cmd(ads_task_cmd_e cmd)
 {
     if(m_q_cmd == NULL) return false;
-    return xQueueSend(m_q_cmd, &cmd, 0);
+  
+    ads_task_cmd_t command = {
+      .cmd = cmd
+    };
+  
+    return xQueueSend(m_q_cmd, &command, 0);
+}
+
+// отправка команды в ads_task с дополнительными данными
+static bool ads_send_cmd_args(ads_task_cmd_e cmd, void *args)
+{
+    if(m_q_cmd == NULL) return false;
+  
+    ads_task_cmd_t command = {
+      .cmd = cmd,
+      .args = args
+    };
+  
+    return xQueueSend(m_q_cmd, &command, 0);
 }
 
 static int32_t sample24bitToInt32(ads129x_24bit_t sample)
@@ -118,11 +155,19 @@ static uint32_t sample24bitToUint32(ads129x_24bit_t sample)
   return res;
 }
 
+static void setupChannel(ads1299_chset_t *ch, uint8_t mux, uint8_t gain, uint8_t pd, uint8_t srb2)
+{ // настройка канала АЦП
+   ch->gain = gain;
+   ch->mux = mux;
+   ch->pd = pd;
+   ch->srb2 = srb2;
+}
+
 
 // в этом потоке осуществляется прием и обработка данных с двух АЦП
 static void ads_task(void *args)
 {
-    ads_task_cmd_e cmd;
+    ads_task_cmd_t cmd;
     adstask_data_t ads_data;
     ads1299_config_t adc0_cfg;
     ads1299_config_t adc1_cfg;
@@ -134,11 +179,11 @@ static void ads_task(void *args)
 
     for(;;) {
         if(pdTRUE != xQueueReceive(m_q_cmd, &cmd, portMAX_DELAY)) {
-            RTT_LOG_INFO("Cmd timeout");
+            RTT_LOG_INFO("ADSTASK: Cmd timeout");
             break;
         }
 
-        switch (cmd) {
+        switch (cmd.cmd) {
             case ADS_TASK_CMD_DATA: // требуется прочитать очередную порцию данных
             {
                 memset(&ads_data, 0, sizeof(ads_data));
@@ -146,7 +191,7 @@ static void ads_task(void *args)
                 // читаю данных из АЦП 0
                 uint16_t err = ads1299_get_data(m_adc0_handle, &data);
                 if(err != ERR_NOERROR) {
-                    RTT_LOG_INFO("Read ADC 0 error 0x%04X", err);
+                    RTT_LOG_INFO("ADSTASK: Read ADC 0 error 0x%04X", err);
                     break;
                 }
                 
@@ -166,7 +211,7 @@ static void ads_task(void *args)
                 // читаю данные из АЦП 1
                 err = ads1299_get_data(m_adc1_handle, &data);
                 if(err != ERR_NOERROR) {
-                    RTT_LOG_INFO("Read ADC 1 error 0x%04X", err);
+                    RTT_LOG_INFO("ADSTASK: Read ADC 1 error 0x%04X", err);
                     break;
                 }
                 
@@ -182,6 +227,10 @@ static void ads_task(void *args)
                 {
                   ads_data.adc1[i] = sample24bitToInt32(data.ch[i]);
                 }
+                
+                // === сюда можно вставить какую-либо обработку данных ===
+                
+                
 
                 // вызываю колбэк и передаю данные на верхний уровень
                 if(m_callback) {
@@ -202,17 +251,20 @@ static void ads_task(void *args)
                 //ads129x_cmd(m_adc1_handle, ADS129X_CMD_START, pdMS_TO_TICKS(100)); // TEST
             
                 if(single_shot) {
+                    // TODO установить глобальный флаг, по которому выполнить команду ADS_TASK_CMD_STOP после получения данных
                     ads_send_cmd(ADS_TASK_CMD_STOP);
                     single_shot = false;
                 }
+                m_is_started = true;
             break;
 
             case ADS_TASK_CMD_STOP:
                 RTT_LOG_INFO("ADS_TASK_CMD_STOP");
-                RTT_LOG_INFO("sample_cnt = %d", --sample_cnt);
+                RTT_LOG_INFO("ADSTASK: sample_cnt = %d", --sample_cnt);
                 // запрещаю прерывания от АЦП
                 ADS129X_INT_DISABLE();
                 ADS129X_STOP(); // останавливаю измерения
+                m_is_started = false;
             break;
 
             case ADS_TASK_CMD_SINGLE:
@@ -223,14 +275,14 @@ static void ads_task(void *args)
                 cfg4.single_shot = 1;
                 uint16_t err = ads1299_set_reg(m_adc0_handle, ADS1299_REG_CONFIG4, *(uint8_t *)&cfg4);
                 if(err != ERR_NOERROR) {
-                    RTT_LOG_INFO("Write to config4 ADC 0 error 0x%04X", err);
+                    RTT_LOG_INFO("ADSTASK: Write to config4 ADC 0 error 0x%04X", err);
                     break;
                 }
                 cfg4 = adc1_cfg.config4;
                 cfg4.single_shot = 1;
                 err = ads1299_set_reg(m_adc1_handle, ADS1299_REG_CONFIG4, *(uint8_t *)&cfg4);
                 if(err != ERR_NOERROR) {
-                    RTT_LOG_INFO("Write to config4 ADC 1 error 0x%04X", err);
+                    RTT_LOG_INFO("ADSTASK: Write to config4 ADC 1 error 0x%04X", err);
                     break;
                 }
                 single_shot = true;
@@ -250,28 +302,77 @@ static void ads_task(void *args)
                 // создаю дефолтный конфиг
                 ads1299_def_config(&adc0_cfg); 
                 ads1299_def_config(&adc1_cfg);
-                // изменяю конфигурацию
-                //NRF_LOG_HEXDUMP_INFO(&adc0_cfg, sizeof(adc0_cfg)); // TEST
-                // TODO
+              
+                // ИЗМЕНЕНИЕ ДЕФОЛТНОЙ КОНФИГУРАЦИИ
+                adc0_cfg.config1.dr = ADS1299_DR_500SPS;
+                setupChannel(&adc0_cfg.ch1set, ADS1299_MUX_NORMAL, ADS1299_GAIN_12, ADS1299_PD_NORMAL, ADS1299_SRB2_OFF);
+                setupChannel(&adc0_cfg.ch2set, ADS1299_MUX_NORMAL, ADS1299_GAIN_12, ADS1299_PD_NORMAL, ADS1299_SRB2_OFF);
+                setupChannel(&adc0_cfg.ch3set, ADS1299_MUX_NORMAL, ADS1299_GAIN_12, ADS1299_PD_NORMAL, ADS1299_SRB2_OFF);
+                setupChannel(&adc0_cfg.ch4set, ADS1299_MUX_NORMAL, ADS1299_GAIN_12, ADS1299_PD_NORMAL, ADS1299_SRB2_OFF);
+                setupChannel(&adc0_cfg.ch5set, ADS1299_MUX_NORMAL, ADS1299_GAIN_12, ADS1299_PD_NORMAL, ADS1299_SRB2_OFF);
+                setupChannel(&adc0_cfg.ch6set, ADS1299_MUX_NORMAL, ADS1299_GAIN_12, ADS1299_PD_NORMAL, ADS1299_SRB2_OFF);
+                setupChannel(&adc0_cfg.ch7set, ADS1299_MUX_NORMAL, ADS1299_GAIN_12, ADS1299_PD_NORMAL, ADS1299_SRB2_OFF);
+                setupChannel(&adc0_cfg.ch8set, ADS1299_MUX_NORMAL, ADS1299_GAIN_12, ADS1299_PD_NORMAL, ADS1299_SRB2_OFF);
+
                 // заливаю новые конфиги в АЦП
                 uint16_t err = ads1299_init(m_adc0_handle, &adc0_cfg);
                 if(err != ERR_NOERROR) {
-                    RTT_LOG_INFO("Init ADC 0 error 0x%04X", err)
+                    RTT_LOG_INFO("ADSTASK: Init ADC 0 error 0x%04X", err)
                 }
                 err = ads1299_init(m_adc1_handle, &adc1_cfg);
                 if(err != ERR_NOERROR) {
-                    RTT_LOG_INFO("Init ADC 1 error 0x%04X", err)
+                    RTT_LOG_INFO("ADSTASK: Init ADC 1 error 0x%04X", err)
                     break;
                 }
-                RTT_LOG_INFO("Init ADC 0 and ADC 1 COMPLETE");
+                RTT_LOG_INFO("ADSTASK: Init ADC 0 and ADC 1 COMPLETE");
             }
+            break;
+            
+            case ADS_TASK_CMD_GET_CFG:   // запрос конфига
+            {
+              ads_cmd_cfg_t *cmd_args = (ads_cmd_cfg_t *)cmd.args;
+              uint16_t err = ERR_UNKNOWN;
+              do{
+                if(cmd_args == NULL) break;
+                
+                ads129x_handle_t handle = NULL;
+                switch(cmd_args->adc_no)
+                {
+                  case ADSTASK_ADC_MASTER:
+                    handle = m_adc1_handle;
+                  break;
+                  
+                  case ADSTASK_ADC_SLAVE:
+                    handle = m_adc0_handle;
+                  break;
+                  
+                  default:
+                    err = ERR_INVALID_PARAMETR;
+                    break;
+                }
+                if(handle == NULL) break;
+                
+                err = ads1299_get_regs(handle, ADS1299_REG_ID, ADS1299_REG_LAST + 1, (uint8_t *)cmd_args->buff);
+                if(err != ERR_NOERROR)
+                {
+                  RTT_LOG_INFO("ADSTASK: Read regs error 0x%04X", err);
+                  break;
+                }
+              }while(0);
+              
+              xQueueSend(m_q_res, &err, 0);
+            }
+            break;
+            
+            case ADS_TASK_CMD_SET_CFG:   // установка нового конфига
+              
             break;
             
             default:    
             break;
         }
 
-        if(cmd == ADS_TASK_CMD_TERMINATE) break;
+        if(cmd.cmd == ADS_TASK_CMD_TERMINATE) break;
     } // for
 
     if(m_q_cmd) {
@@ -305,7 +406,7 @@ uint16_t ads_task_init(ads_task_callback_t callback)
         err = spiInit(&m_spiDevID, SPIM3, SPIM3_IRQn, SPIM3_PRIORITY, SPIM3_FREQUENCY);
         if(err != ERR_NOERROR)
         {
-          RTT_LOG_INFO("MAIN: Can't init SPIM3!");
+          RTT_LOG_INFO("ADSTASK: Can't init SPIM3!");
           break;
         }
         
@@ -337,8 +438,20 @@ uint16_t ads_task_init(ads_task_callback_t callback)
         }
 
         // создаю очередь для управляющих команд
-        m_q_cmd = xQueueCreate(ADSTASK_CMD_QUEUE_SIZE, sizeof(ads_task_cmd_e));
+        m_q_cmd = xQueueCreate(ADSTASK_CMD_QUEUE_SIZE, sizeof(ads_task_cmd_t));
         if(m_q_cmd == NULL) {
+            err = ERR_OUT_OF_MEMORY;
+            break;
+        }
+        
+        m_q_res = xQueueCreate(1, sizeof(uint16_t));
+        if(m_q_res == NULL) {
+            err = ERR_OUT_OF_MEMORY;
+            break;
+        }
+        
+        m_mutex = xSemaphoreCreateMutex();
+        if(m_mutex == NULL) {
             err = ERR_OUT_OF_MEMORY;
             break;
         }
@@ -391,6 +504,14 @@ uint16_t ads_task_deinit(void)
         vTaskDelete(m_ads_task);
         m_ads_task = NULL;
     }
+    if(m_q_res) {
+        vQueueDelete(m_q_res);
+        m_q_res = NULL;
+    }
+    if(m_mutex) {
+        vSemaphoreDelete(m_mutex);
+        m_mutex = NULL;
+    }
     m_callback = NULL;
     
     return ERR_NOERROR;
@@ -437,6 +558,72 @@ uint16_t ads_task_stop(void)
     // отправляю команду на остановку измерений
     if(!ads_send_cmd(ADS_TASK_CMD_STOP)) return ERR_FIFO_OVF;
     return ERR_NOERROR;
+}
+
+
+/**
+ * Запрос конфига
+ * 
+ * adc_no - номер АЦП
+ * cfg_srt - строка конфига в формате: n,rrvv,....,rrvv где n - номер АЦП (0 или 1), rrvv - uint16_t, где rr - адрес регистра, vv - значение регистра
+ * cfg_len_max - максимальный размер буфер под строку с конфигом
+ * timeout_ms - максимальное время ожидания начала выполенния задания
+ * return
+ *  ERR_NOERROR - если ошибок нет
+ *  ERR_NOT_INITED - модуль не инициализирован
+ *  ERR_FIFO_OVF - переполнение очереди команд
+ *  ERR_INVALID_PARAMETR - ошибка входных данных
+ *  ERR_TIMEOUT - таймаут ожидания доступа
+ *  ERR_INVALID_STATE - АЦП в процессе измерения
+*/
+uint16_t ads_task_get_config(adstask_adc_no_e adc_no, char *cfg_str, uint8_t cfg_len_max, uint32_t timeout_ms)
+{
+  // проверяю, была ли начальная инициализация
+  if(m_ads_task == NULL) return ERR_NOT_INITED;
+  if((cfg_str == NULL) || (cfg_len_max < 7)) return ERR_INVALID_PARAMETR;
+  if(m_is_started) return ERR_INVALID_STATE; // идет процесс измерений
+  if((uint8_t)adc_no >= ADS129X_CNT) return ERR_INVALID_PARAMETR;
+  
+  if(pdTRUE != xSemaphoreTake(m_mutex, pdMS_TO_TICKS(timeout_ms))) return ERR_TIMEOUT;
+  
+  uint8_t buff[ADS1299_REG_LAST + 1]; // буфер под конфиг
+  char regval[6]; // буфер для очередного значения
+  uint16_t err = ERR_NOERROR;
+  
+  do{
+    
+    ads_cmd_cfg_t args = {
+      .adc_no = adc_no,
+      .buff = buff
+    };
+    
+    // отправляю задание на получение конфига
+    if(!ads_send_cmd_args(ADS_TASK_CMD_GET_CFG, &args)) 
+    {
+      err = ERR_FIFO_OVF;
+      break; // на выход, если очередь переоплнена
+    }
+    
+    if(pdTRUE != xQueueReceive(m_q_res, &err, pdMS_TO_TICKS(timeout_ms)))
+    {
+      err = ERR_TIMEOUT;
+      break;
+    }
+    
+    if(err != ERR_NOERROR) break; // чтение регистров не было выполнено
+    
+    snprintf(cfg_str, cfg_len_max, "%d", (uint8_t)adc_no);
+    // конфигурация прочитана в буфер, преобразую ее в заданный вид
+    for(uint8_t i = 0; i <= ADS1299_REG_LAST; i++)
+    {
+      snprintf(regval, sizeof(regval), ",%02X%02X", i, buff[i]);
+      if((strlen(cfg_str) + strlen(regval)) >= cfg_len_max) break;
+      strcat(cfg_str, regval);
+    }
+  }while(0);
+  
+  xSemaphoreGive(m_mutex);
+  return err;
 }
 
 

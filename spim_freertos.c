@@ -36,7 +36,7 @@
 
 #if(RTTLOG_EN)
 #include "logger_freertos.h"
-#define RTT_LOG_EN                1     // включить лог через RTT
+#define RTT_LOG_EN                0     // включить лог через RTT
 #define TAG                     "SPIM: "
 #else
 #define RTT_LOG_EN 0

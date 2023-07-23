@@ -39,6 +39,7 @@
 #define ADS1299_REG_MISC1       0x15    ///< Miscellaneous 1 Register
 #define ADS1299_REG_MISC2       0x16    ///< Miscellaneous 2 Register
 #define ADS1299_REG_CONFIG4     0x17    ///< Конфигурационный регистр 4
+#define ADS1299_REG_LAST        ADS1299_REG_CONFIG4 ///< адрес последнего конфигурационного регистра
 
 /// БИТОВЫЕ МАСКИ, ЗНАЧЕНИЯ ПОЛЕЙ
 #define ADS1299_ID_MASK         0x1F    ///< Маска для выделения ID микросхемы
@@ -99,12 +100,20 @@
 
 /// PGA Gain
 #define ADS1299_GAIN_1          0x00    ///< Усиление 1
-#define ADS1299_GAIN_2          0x00    ///< Усиление 2
-#define ADS1299_GAIN_4          0x00    ///< Усиление 4
-#define ADS1299_GAIN_6          0x00    ///< Усиление 6
-#define ADS1299_GAIN_8          0x00    ///< Усиление 8
-#define ADS1299_GAIN_12         0x00    ///< Усиление 12
-#define ADS1299_GAIN_24         0x00    ///< Усиление 24
+#define ADS1299_GAIN_2          0x01    ///< Усиление 2
+#define ADS1299_GAIN_4          0x02    ///< Усиление 4
+#define ADS1299_GAIN_6          0x03    ///< Усиление 6
+#define ADS1299_GAIN_8          0x04    ///< Усиление 8
+#define ADS1299_GAIN_12         0x05    ///< Усиление 12
+#define ADS1299_GAIN_24         0x06    ///< Усиление 24
+
+/// Power-down bit
+#define ADS1299_PD_POWERDOWN    0x01    ///< Канал выключен
+#define ADS1299_PD_NORMAL       0x00    ///< Канал включен
+
+// Управление SRB2
+#define ADS1299_SRB2_OFF        0x00    ///< Отключено
+#define ADS1299_SRB2_ON         0x01    ///< Включено
 
 /// Номера каналов
 #define ADS1299_CH_1            0       ///< Канал 1 
@@ -334,6 +343,23 @@ uint16_t ads1299_set_reg(ads129x_handle_t handle, uint8_t reg_addr, uint8_t val)
  *  ERR_TIMEOUT: таймаут ожидания доступа к шине SPI
 */
 uint16_t ads1299_get_reg(ads129x_handle_t handle, uint8_t reg_addr, uint8_t *val);
+
+
+/**
+ * @brief Чтение нескольких регистров
+ * 
+ * @param handle - Хендл микросхемы на шине SPI
+ * @param reg_addr - Адрес регистра
+ * @param cnt - Число регистров для чтения
+ * @param buff - Буфер для чтения
+ * 
+ * @return
+ *  ERR_NOERROR - если ошибок нет
+ *  ERR_INVALID_PARAMETR - в случае ошибки во входных параметрах
+ *  ERR_NOT_INITED: интерфейс SPI не инициализирован
+ *  ERR_TIMEOUT: таймаут ожидания доступа к шине SPI
+*/
+uint16_t ads1299_get_regs(ads129x_handle_t handle, uint8_t reg_addr, uint8_t cnt, uint8_t *buff);
 
 
 /**

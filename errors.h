@@ -40,7 +40,7 @@
 #define ERR_RESET               0x0014    // сброс по входу RESET
 #define ERR_OUT_OF_MEMORY       0x0015    // недостаточно памяти
 #define ERR_ALREADY_INITED      0x0016    // уже инициализировано
-#define ERR_OPEN                0x0017    // ошибка при открытии
+#define ERR_INVALID_STATE       0x0017    // неверное состояние
 #define ERR_SOFTRESET           0x0018    // программный сброс
 #define ERR_DISABLED            0x0019    // устройство или команда запрещены
 

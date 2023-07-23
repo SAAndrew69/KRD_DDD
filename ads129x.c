@@ -198,20 +198,7 @@ uint16_t ads129x_read_data(ads129x_handle_t handle, ads129x_data_t *rx_data, uin
     .csPin = hdl->csPin
   };
         
-  uint16_t err = spiTaskExecute(hdl->spiDevID, &spi_task, pdMS_TO_TICKS(timeout_ms));
-  
-  if(err != ERR_NOERROR) return err;
-  
-  // преобразую данные к 32 битам
-  // rx_data->status = data.status.val;
-  
-  // for(uint8_t i=0; i < ADS129X_CH_CNT; i++)
-  // {
-  //   if(data.ch[i].val & (1UL << 23)) rx_data->ch[i] = (0xFFUL << 24) + data.ch[i].val;
-  //   else rx_data->ch[i] = data.ch[i].val;
-  // }
-  
-  return ERR_NOERROR;
+  return spiTaskExecute(hdl->spiDevID, &spi_task, pdMS_TO_TICKS(timeout_ms));
 }
 
 
