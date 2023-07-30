@@ -9,7 +9,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "ads129x.h"
-#include "ads1299.h"
+//#include "ads1299.h"
 
 
 /// формат выходных данных от двух АЦП
@@ -92,6 +92,23 @@ uint16_t ads_task_stop(void);
 */
 uint16_t ads_task_get_config(adstask_adc_no_e adc_no, char *cfg_str, uint8_t cfg_len_max, uint32_t timeout_ms);
 
+
+/**
+ * @brief Сохранение регистра
+ * 
+ * @param adc_no - номер АЦП
+ * @param reg_addr - адрес регистра
+ * @param reg_val - значение регистра
+ * @param timeout_ms - максимальное время ожидания начала выполенния задания
+ * @return
+ *  ERR_NOERROR - если ошибок нет
+ *  ERR_NOT_INITED - модуль не инициализирован
+ *  ERR_FIFO_OVF - переполнение очереди команд
+ *  ERR_INVALID_PARAMETR - ошибка входных данных
+ *  ERR_TIMEOUT - таймаут ожидания доступа
+ *  ERR_INVALID_STATE - АЦП в процессе измерения
+*/
+uint16_t ads_task_set_reg(adstask_adc_no_e adc_no, uint8_t reg_addr, uint8_t reg_val, uint32_t timeout_ms);
 
 
 

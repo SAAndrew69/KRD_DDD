@@ -444,21 +444,6 @@
               <FilePath>..\debug_monitor.c</FilePath>
             </File>
             <File>
-              <FileName>ads129x.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ads129x.c</FilePath>
-            </File>
-            <File>
-              <FileName>ads1299.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ads1299.c</FilePath>
-            </File>
-            <File>
-              <FileName>ads_task.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ads_task.c</FilePath>
-            </File>
-            <File>
               <FileName>bleDriver.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\bleDriver.c</FilePath>
@@ -467,6 +452,21 @@
               <FileName>bleTask.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\bleTask.c</FilePath>
+            </File>
+            <File>
+              <FileName>ads_task.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ads_task.c</FilePath>
+            </File>
+            <File>
+              <FileName>ads129x.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ads129x.c</FilePath>
+            </File>
+            <File>
+              <FileName>ads1298.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ads1298.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -4543,21 +4543,6 @@
               <FilePath>..\debug_monitor.c</FilePath>
             </File>
             <File>
-              <FileName>ads129x.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ads129x.c</FilePath>
-            </File>
-            <File>
-              <FileName>ads1299.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ads1299.c</FilePath>
-            </File>
-            <File>
-              <FileName>ads_task.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\ads_task.c</FilePath>
-            </File>
-            <File>
               <FileName>bleDriver.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\bleDriver.c</FilePath>
@@ -4566,6 +4551,21 @@
               <FileName>bleTask.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\bleTask.c</FilePath>
+            </File>
+            <File>
+              <FileName>ads_task.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ads_task.c</FilePath>
+            </File>
+            <File>
+              <FileName>ads129x.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ads129x.c</FilePath>
+            </File>
+            <File>
+              <FileName>ads1298.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ads1298.c</FilePath>
             </File>
           </Files>
         </Group>

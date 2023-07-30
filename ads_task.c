@@ -1,9 +1,6 @@
 /**
  * Модуль реализует логику работы с двумя АЦП
  * 
- * 11.07.2023 - Начало работы
- * 20.07.2023 - Отладил работу модуля
- * 
  * 
  * ЛОГИКА РАБОТЫ
  * 
@@ -16,7 +13,7 @@
 #include "nrf.h"
 #include "ads_task.h"
 #include "ads129x.h"
-#include "ads1299.h"
+#include "ads1298.h"
 #include "settings.h"
 #include "custom_board.h"
 #include "nrf_delay.h"
@@ -155,12 +152,11 @@ static uint32_t sample24bitToUint32(ads129x_24bit_t sample)
   return res;
 }
 
-static void setupChannel(ads1299_chset_t *ch, uint8_t mux, uint8_t gain, uint8_t pd, uint8_t srb2)
+static void setupChannel(ads1298_chset_t *ch, uint8_t mux, uint8_t gain, uint8_t pd)
 { // настройка канала АЦП
    ch->gain = gain;
    ch->mux = mux;
    ch->pd = pd;
-   ch->srb2 = srb2;
 }
 
 
@@ -169,11 +165,21 @@ static void ads_task(void *args)
 {
     ads_task_cmd_t cmd;
     adstask_data_t ads_data;
-    ads1299_config_t adc0_cfg;
-    ads1299_config_t adc1_cfg;
+    ads1298_config_t adc0_cfg;
+    ads1298_config_t adc1_cfg;
     bool single_shot = false;
   
     uint32_t sample_cnt = 0; // TEST
+  
+    // TEST
+//    ads129x_data_t data_const;
+//    memset(&data_const, 0, sizeof(data_const));
+//    for(uint8_t i=0; i < 8; i++)
+//    {
+//      data_const.ch[i].val[0] = 0xFC;
+//      data_const.ch[i].val[1] = 0x18;
+//      data_const.ch[i].val[2] = 0xAA;
+//    }
 
     ads_send_cmd(ADS_TASK_CMD_INIT);
 
@@ -188,8 +194,9 @@ static void ads_task(void *args)
             {
                 memset(&ads_data, 0, sizeof(ads_data));
                 ads129x_data_t data;
+
                 // читаю данных из АЦП 0
-                uint16_t err = ads1299_get_data(m_adc0_handle, &data);
+                uint16_t err = ads1298_get_data(m_adc0_handle, &data);
                 if(err != ERR_NOERROR) {
                     RTT_LOG_INFO("ADSTASK: Read ADC 0 error 0x%04X", err);
                     break;
@@ -207,9 +214,14 @@ static void ads_task(void *args)
                 {
                   ads_data.adc0[i] = sample24bitToInt32(data.ch[i]);
                 }
+//                ads_data.adc0_status = sample24bitToUint32(data.status);
+//                for(uint8_t i = 0; i < ADS129X_CH_CNT; i++)
+//                {
+//                  ads_data.adc0[i] = sample24bitToInt32(data_const.ch[i]);
+//                }
 
                 // читаю данные из АЦП 1
-                err = ads1299_get_data(m_adc1_handle, &data);
+                err = ads1298_get_data(m_adc1_handle, &data);
                 if(err != ERR_NOERROR) {
                     RTT_LOG_INFO("ADSTASK: Read ADC 1 error 0x%04X", err);
                     break;
@@ -227,6 +239,12 @@ static void ads_task(void *args)
                 {
                   ads_data.adc1[i] = sample24bitToInt32(data.ch[i]);
                 }
+//                ads_data.adc1_status = sample24bitToUint32(data.status);
+//                for(uint8_t i = 0; i < ADS129X_CH_CNT; i++)
+//                {
+//                  ads_data.adc1[i] = sample24bitToInt32(data_const.ch[i]);
+//                }
+
                 
                 // === сюда можно вставить какую-либо обработку данных ===
                 
@@ -271,16 +289,16 @@ static void ads_task(void *args)
             {
                 RTT_LOG_INFO("ADS_TASK_CMD_SINGLE");
                 // установить бит "single_shot" и запустить измерения
-                ads1299_config4_t cfg4 = adc0_cfg.config4;
+                ads1298_config4_t cfg4 = adc0_cfg.config4;
                 cfg4.single_shot = 1;
-                uint16_t err = ads1299_set_reg(m_adc0_handle, ADS1299_REG_CONFIG4, *(uint8_t *)&cfg4);
+                uint16_t err = ads1298_set_reg(m_adc0_handle, ADS1298_REG_CONFIG4, *(uint8_t *)&cfg4);
                 if(err != ERR_NOERROR) {
                     RTT_LOG_INFO("ADSTASK: Write to config4 ADC 0 error 0x%04X", err);
                     break;
                 }
                 cfg4 = adc1_cfg.config4;
                 cfg4.single_shot = 1;
-                err = ads1299_set_reg(m_adc1_handle, ADS1299_REG_CONFIG4, *(uint8_t *)&cfg4);
+                err = ads1298_set_reg(m_adc1_handle, ADS1298_REG_CONFIG4, *(uint8_t *)&cfg4);
                 if(err != ERR_NOERROR) {
                     RTT_LOG_INFO("ADSTASK: Write to config4 ADC 1 error 0x%04X", err);
                     break;
@@ -300,26 +318,44 @@ static void ads_task(void *args)
                 single_shot = false;
                 // начальное конфигурирование АЦП
                 // создаю дефолтный конфиг
-                ads1299_def_config(&adc0_cfg); 
-                ads1299_def_config(&adc1_cfg);
+                ads1298_def_config(&adc0_cfg); 
+                ads1298_def_config(&adc1_cfg);
               
                 // ИЗМЕНЕНИЕ ДЕФОЛТНОЙ КОНФИГУРАЦИИ
-                adc0_cfg.config1.dr = ADS1299_DR_500SPS;
-                setupChannel(&adc0_cfg.ch1set, ADS1299_MUX_NORMAL, ADS1299_GAIN_12, ADS1299_PD_NORMAL, ADS1299_SRB2_OFF);
-                setupChannel(&adc0_cfg.ch2set, ADS1299_MUX_NORMAL, ADS1299_GAIN_12, ADS1299_PD_NORMAL, ADS1299_SRB2_OFF);
-                setupChannel(&adc0_cfg.ch3set, ADS1299_MUX_NORMAL, ADS1299_GAIN_12, ADS1299_PD_NORMAL, ADS1299_SRB2_OFF);
-                setupChannel(&adc0_cfg.ch4set, ADS1299_MUX_NORMAL, ADS1299_GAIN_12, ADS1299_PD_NORMAL, ADS1299_SRB2_OFF);
-                setupChannel(&adc0_cfg.ch5set, ADS1299_MUX_NORMAL, ADS1299_GAIN_12, ADS1299_PD_NORMAL, ADS1299_SRB2_OFF);
-                setupChannel(&adc0_cfg.ch6set, ADS1299_MUX_NORMAL, ADS1299_GAIN_12, ADS1299_PD_NORMAL, ADS1299_SRB2_OFF);
-                setupChannel(&adc0_cfg.ch7set, ADS1299_MUX_NORMAL, ADS1299_GAIN_12, ADS1299_PD_NORMAL, ADS1299_SRB2_OFF);
-                setupChannel(&adc0_cfg.ch8set, ADS1299_MUX_NORMAL, ADS1299_GAIN_12, ADS1299_PD_NORMAL, ADS1299_SRB2_OFF);
+                uint8_t mux = ADS1298_MUX_NORMAL;
+                uint8_t gain = ADS1298_GAIN_12;
+                setupChannel(&adc0_cfg.ch1set, mux, gain, ADS1298_PD_NORMAL);
+                setupChannel(&adc0_cfg.ch2set, mux, gain, ADS1298_PD_NORMAL);
+                setupChannel(&adc0_cfg.ch3set, mux, gain, ADS1298_PD_NORMAL);
+                setupChannel(&adc0_cfg.ch4set, mux, gain, ADS1298_PD_NORMAL);
+                setupChannel(&adc0_cfg.ch5set, mux, gain, ADS1298_PD_NORMAL);
+                setupChannel(&adc0_cfg.ch6set, mux, gain, ADS1298_PD_NORMAL);
+                setupChannel(&adc0_cfg.ch7set, mux, gain, ADS1298_PD_NORMAL);
+                setupChannel(&adc0_cfg.ch8set, mux, gain, ADS1298_PD_NORMAL);
+              
+                setupChannel(&adc1_cfg.ch1set, mux, gain, ADS1298_PD_NORMAL);
+                setupChannel(&adc1_cfg.ch2set, mux, gain, ADS1298_PD_NORMAL);
+                setupChannel(&adc1_cfg.ch3set, mux, gain, ADS1298_PD_NORMAL);
+                setupChannel(&adc1_cfg.ch4set, mux, gain, ADS1298_PD_NORMAL);
+                setupChannel(&adc1_cfg.ch5set, mux, gain, ADS1298_PD_NORMAL);
+                setupChannel(&adc1_cfg.ch6set, mux, gain, ADS1298_PD_NORMAL);
+                setupChannel(&adc1_cfg.ch7set, mux, gain, ADS1298_PD_NORMAL);
+                setupChannel(&adc1_cfg.ch8set, mux, gain, ADS1298_PD_NORMAL);
+                
+                // настройка точки Вилсона
+                adc0_cfg.wct1.wcta = ADS1298_WCTA_CH1P;
+                adc0_cfg.wct1.pd_wcta = 1;
+                adc0_cfg.wct2.wctb = ADS1298_WCTB_CH1N;
+                adc0_cfg.wct2.wctc = ADS1298_WCTC_CH2P;
+                adc0_cfg.wct2.pd_wctb = 1;
+                adc0_cfg.wct2.pd_wctc = 1;
 
                 // заливаю новые конфиги в АЦП
-                uint16_t err = ads1299_init(m_adc0_handle, &adc0_cfg);
+                uint16_t err = ads1298_init(m_adc0_handle, &adc0_cfg);
                 if(err != ERR_NOERROR) {
                     RTT_LOG_INFO("ADSTASK: Init ADC 0 error 0x%04X", err)
                 }
-                err = ads1299_init(m_adc1_handle, &adc1_cfg);
+                err = ads1298_init(m_adc1_handle, &adc1_cfg);
                 if(err != ERR_NOERROR) {
                     RTT_LOG_INFO("ADSTASK: Init ADC 1 error 0x%04X", err)
                     break;
@@ -339,11 +375,11 @@ static void ads_task(void *args)
                 switch(cmd_args->adc_no)
                 {
                   case ADSTASK_ADC_MASTER:
-                    handle = m_adc1_handle;
+                    handle = m_adc0_handle;
                   break;
                   
                   case ADSTASK_ADC_SLAVE:
-                    handle = m_adc0_handle;
+                    handle = m_adc1_handle;
                   break;
                   
                   default:
@@ -352,7 +388,7 @@ static void ads_task(void *args)
                 }
                 if(handle == NULL) break;
                 
-                err = ads1299_get_regs(handle, ADS1299_REG_ID, ADS1299_REG_LAST + 1, (uint8_t *)cmd_args->buff);
+                err = ads1298_get_regs(handle, ADS1298_REG_ID, ADS1298_REG_LAST + 1, (uint8_t *)cmd_args->buff);
                 if(err != ERR_NOERROR)
                 {
                   RTT_LOG_INFO("ADSTASK: Read regs error 0x%04X", err);
@@ -586,7 +622,7 @@ uint16_t ads_task_get_config(adstask_adc_no_e adc_no, char *cfg_str, uint8_t cfg
   
   if(pdTRUE != xSemaphoreTake(m_mutex, pdMS_TO_TICKS(timeout_ms))) return ERR_TIMEOUT;
   
-  uint8_t buff[ADS1299_REG_LAST + 1]; // буфер под конфиг
+  uint8_t buff[ADS1298_REG_LAST + 1]; // буфер под конфиг
   char regval[6]; // буфер для очередного значения
   uint16_t err = ERR_NOERROR;
   
@@ -614,7 +650,7 @@ uint16_t ads_task_get_config(adstask_adc_no_e adc_no, char *cfg_str, uint8_t cfg
     
     snprintf(cfg_str, cfg_len_max, "%d", (uint8_t)adc_no);
     // конфигурация прочитана в буфер, преобразую ее в заданный вид
-    for(uint8_t i = 0; i <= ADS1299_REG_LAST; i++)
+    for(uint8_t i = 0; i <= ADS1298_REG_LAST; i++)
     {
       snprintf(regval, sizeof(regval), ",%02X%02X", i, buff[i]);
       if((strlen(cfg_str) + strlen(regval)) >= cfg_len_max) break;
@@ -626,4 +662,54 @@ uint16_t ads_task_get_config(adstask_adc_no_e adc_no, char *cfg_str, uint8_t cfg
   return err;
 }
 
+/**
+ * Сохранение регистра
+ * 
+ * adc_no - номер АЦП
+ * reg_addr - адрес регистра
+ * reg_val - значение регистра
+ * timeout_ms - максимальное время ожидания начала выполенния задания
+ * return
+ *  ERR_NOERROR - если ошибок нет
+ *  ERR_NOT_INITED - модуль не инициализирован
+ *  ERR_FIFO_OVF - переполнение очереди команд
+ *  ERR_INVALID_PARAMETR - ошибка входных данных
+ *  ERR_TIMEOUT - таймаут ожидания доступа
+ *  ERR_INVALID_STATE - АЦП в процессе измерения
+*/
+uint16_t ads_task_set_reg(adstask_adc_no_e adc_no, uint8_t reg_addr, uint8_t reg_val, uint32_t timeout_ms)
+{
+  // проверяю, была ли начальная инициализация
+  if(m_ads_task == NULL) return ERR_NOT_INITED;
+  if(m_is_started) return ERR_INVALID_STATE; // идет процесс измерений
+  if((uint8_t)adc_no >= ADS129X_CNT) return ERR_INVALID_PARAMETR;
+  if(reg_addr > ADS1298_REG_LAST) return ERR_INVALID_PARAMETR;
+  
+  if(pdTRUE != xSemaphoreTake(m_mutex, pdMS_TO_TICKS(timeout_ms))) return ERR_TIMEOUT;
+  
+  uint16_t err = ERR_NOERROR;
+  
+  do{
+    ads129x_handle_t handle = NULL;
+    switch(adc_no)
+    {
+      case ADSTASK_ADC_MASTER:
+        handle = m_adc0_handle;
+      break;
+                  
+      case ADSTASK_ADC_SLAVE:
+        handle = m_adc1_handle;
+      break;
+                  
+      default:
+        err = ERR_INVALID_PARAMETR;
+        break;
+      }
+    if(handle == NULL) break;
+    err = ads1298_set_reg(handle, reg_addr, reg_val);
+  }while(0);
+  
+  xSemaphoreGive(m_mutex);
+  return err;  
+}
 

@@ -2,10 +2,6 @@
 /**
  *  Реализация логики работы устройства
  * 
- * 20.07.2023 - Отладил работу АЦП вместе с BLE
- * 
- * 
- * 
  *  ОГРАНИЧЕНИЯ
  * - если было приянято несколько команд управления, то будет обработана только одна (самая первая), все остальное будет удалено
 */
@@ -15,12 +11,14 @@
 #include "sys.h"
 //#include "spim_freertos.h"
 #include "ads_task.h"
+#include "ads1298.h"  // берем только константу ADS1298_REG_LAST
 #include "bleTask.h"
 #include "cmd.h"
 
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "nordic_common.h"
 #include "nrf.h"
 #include "nrf_sdh.h"
@@ -299,8 +297,7 @@ void execCmdBle(int16_t conn_handle)
   // будет обработана только первая команда, остальное - в утиль
   uint32_t cnt = bleGetRxDataSize(conn_handle); // размер данных в буфере
   if(cnt == 0) return;
-  uint32_t cmdLen = cnt; // длина команды
-  if(cnt >= CMD_LEN_MAX) cmdLen = CMD_LEN_MAX;
+  uint32_t cmdLen = MIN(CMD_LEN_MAX, cnt);
   bleGetRxData(conn_handle, m_cmdBuff, cmdLen, 0); // вычитываю все
   if(cnt >= CMD_LEN_MAX)
   { // если данных буфере больше максимальной длины команды - удаляю все
@@ -393,7 +390,7 @@ void execCmdBle(int16_t conn_handle)
         uint8_t adc_no = m_cmdBuff[2] - '0'; // преобразую номер АЦП в число
         if(adc_no >= ADS129X_CNT)
         {
-          RTT_LOG_INFO("CMD: Неверный номер АЦП (может быть 0 или 1)");
+          RTT_LOG_INFO("CMD: Wrong ADC number: it can be either 0 or 1");
           break;
         }
         char str[150];
@@ -410,8 +407,36 @@ void execCmdBle(int16_t conn_handle)
     }
     break;
     
-    case CMD_CMD_SET_CFG: // Установка нового конфига (формат как у CMD_CMD_GET_CFG)
-      
+    case CMD_CMD_SET_CFG: // Установка нового конфига (формат: S,n,rrvv,...,rrvv где n - номер АЦП, rrvv - uint16, где rr - адрес регистра, vv - значение)
+    {
+      uint8_t adc_no = m_cmdBuff[2] - '0'; // преобразую номер АЦП в число
+      if(adc_no >= ADS129X_CNT)
+      {
+        RTT_LOG_INFO("CMD: Wrong ADC number: it can be either 0 or 1");
+        break;
+      }
+      // начиная с позиции 4 идут uint16 разделенные запятой
+      char *pVal = strtok((char *)&m_cmdBuff[4],",");
+      while(pVal)
+      { // запись принятых значений в АЦП
+        uint16_t val = strtol(pVal, NULL, 16); // выделяю значение очередной пары
+        if(val == 0) 
+        {
+          RTT_LOG_INFO("CMD: Recieve invalid pair");
+          break; // принято недопустимое значение
+        }
+        uint8_t regAddr = val >> 8; // значение адреса регистра
+        uint8_t regVal = (uint8_t)val; // значение регистра
+        // отправляю новое значение в АЦП
+        uint16_t err = ads_task_set_reg((adstask_adc_no_e)adc_no, regAddr, regVal, TIME_CMD_MS);
+        if(err != ERR_NOERROR)
+        {
+          RTT_LOG_INFO("CMD: Set new val 0x%02X to addr 0x%02X error 0x%04X", regVal, regAddr, err);
+        }
+        // переходим к следующей паре значений
+        pVal = strtok(NULL, ",");
+      }
+    }
     break;
 
     case CMD_CMD_SHOT   : // Единичный отсчет АЦП
