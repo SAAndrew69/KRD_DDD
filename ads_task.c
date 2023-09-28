@@ -349,6 +349,10 @@ static void ads_task(void *args)
                 adc0_cfg.wct2.wctc = ADS1298_WCTC_CH2P;
                 adc0_cfg.wct2.pd_wctb = 1;
                 adc0_cfg.wct2.pd_wctc = 1;
+                
+                // настройка RLD
+                adc0_cfg.rld_sensn = 0x03;
+                adc0_cfg.rld_sensp = 0x03;
 
                 // заливаю новые конфиги в АЦП
                 uint16_t err = ads1298_init(m_adc0_handle, &adc0_cfg);

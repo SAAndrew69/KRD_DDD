@@ -126,9 +126,12 @@ static void ads_task_callback(adstask_data_t *ads_data)
 //  }
   // формирую пакет для отправки
   for(uint8_t i=0; i < ADS129X_CH_CNT; i++)
-  { // преобразую 24 бит в 16
-    m_adcData.adc0[i] = (int16_t)(ads_data->adc0[i] >> 8);
-    m_adcData.adc1[i] = (int16_t)(ads_data->adc1[i] >> 8);
+  { // преобразую 32 бит в 16
+//    m_adcData.adc0[i] = (int16_t)(ads_data->adc0[i] >> 8);
+//    m_adcData.adc1[i] = (int16_t)(ads_data->adc1[i] >> 8);
+    // новое хитрое преобразование
+    m_adcData.adc0[i] = (int16_t)(ads_data->adc0[i] >> 5);
+    m_adcData.adc1[i] = (int16_t)(ads_data->adc1[i] >> 5);
   }
   m_adcData.startMarker = MAIN_BLE_ACD_START_MARKER;
 

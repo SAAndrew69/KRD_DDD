@@ -47,7 +47,7 @@ void ads1298_def_config(ads1298_config_t *config)
     ads1298_config3_t config3 = {
         .rld_stat = 0,              // RLD отключен
         .rld_loff_sens = 0,         // RLD sense is disabled
-        .pd_rld = 0,                // RLD buffer is powered down
+        .pd_rld = 1,                // RLD buffer is powered up
         .rldref_int = 1,            // RLDREF signal (AVDD + AVSS) / 2 generated internally
         .rld_meas = 0,              // Измерения не проводятся
         .vref_4v = 0,               // VREFP is set to 2.4 V
